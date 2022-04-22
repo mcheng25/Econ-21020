@@ -1,0 +1,157 @@
+---
+title: "ECON 21020 Tabord-Meehan Pset 3 Question 6"
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
+---
+
+```{r}
+options(digits=4,scipen=100)
+```
+
+### Section (a)
+
+```{r,include=FALSE,echo=FALSE}
+library(dplyr)
+library(tidyverse)
+library(ggplot2)
+library(readxl)
+```
+
+```{r}
+data <- read_xlsx("caschool.xlsx")
+data
+```
+
+Answer: We have 420 observations
+
+### Section (b)
+
+```{r}
+data <- data %>% mutate(income = avginc * 1000)
+data
+```
+
+#### Part (i): 
+
+The variable `income` measures average district income, denominated in dollars. 
+
+#### Part (ii):
+```{r}
+avginc_mean = mean(data$avginc)
+avginc_sd = sd(data$avginc)
+```
+
+The mean of `avginc` is `r avginc_mean` and the standard deviation of `avginc` is `r avginc_sd`. 
+
+
+#### Part (iii):
+```{r}
+inc_mean = mean(data$income)
+inc_sd = sd(data$income)
+```
+
+The mean of `income` is `r inc_mean` and the standard deviation of `income` is `r inc_sd`. 
+
+The mean and standard deviations of `income` are 1000 times the mean and standard deviation of `avginc`, which is what I would expect.
+
+### Section (c)
+
+#### Part (i):
+
+```{r}
+mean_math = mean(data$math_scr)
+```
+
+The mean math score is `r mean_math`.
+
+#### Part (ii):
+
+```{r}
+#From Stack Overflow: Learned that you can find proportions by taking the mean
+#of a vector of boolean (true/false) values. Almost like an indicator var.
+#https://stackoverflow.com/questions/68485739/calculating-proportion-of-values-using-condition-and-grouping-by-id-in-r
+
+data_new <- data %>% 
+  mutate(is_large = ifelse(data$str > 20, 1, 0)) %>% 
+  group_by(is_large) %>% 
+  summarize(math = mean(math_scr), varmath = var(math_scr), n = n()) %>%
+  mutate(frac = n/sum(n))
+
+data_new
+```
+
+243/420 schools have class sizes of 20 students or less, and the mean math score among these schools is 655.7.
+
+#### Part (iii):
+
+Per the summary table above, 177/420 schools have class sizes of more than 20 students, and the mean math score among these schools is 650.1.
+
+#### Part (iv):
+
+In math: The overall mean we recovered in part 1 should be equal to a weighed sum of the group means recovered in part 2 and part 3 where the weights are the fraction of the total observations that fall into each group. 
+
+#### Part (v):
+$$
+H_0: E[Math|is\_large=0] = E[Math|is\_large=1] \\
+\Rightarrow E[Math|is\_large=0] - E[Math|is\_large=1] = 0 \\
+H_a: E[Math|is\_large=0] - E[Math|is\_large=1] \neq 0
+$$
+
+To simplify notation: Let LG be a variable describing the math scores of districts with large class sizes, and SM be a variable describing the math scores of districts with small classes. Then we can conduct a two-sample test. 
+
+The test statistic $T_n$ is as follows:
+
+
+```{=latex}
+$$T_n = \left | \frac{\bar{SM}-\bar{LG} - 0}{\sqrt{\frac{\hat{\sigma_{LG}}}{n_{LG}} + \frac{\hat{\sigma_{SM}}}{n_{SM}}}}\right |$$
+```
+
+In code:
+```{r}
+data_new <- data_new %>% arrange(is_large) #ensure that small is before large
+```
+
+```{r}
+mean_sm = data_new$math[[1]] #get relevant col of first row
+mean_lg = data_new$math[[2]] #get relevant col of second row
+
+var_sm = data_new$varmath[[1]]
+var_lg = data_new$varmath[[2]]
+
+count_sm = data_new$n[[1]]
+count_lg = data_new$n[[2]]
+
+diff = mean_sm - mean_lg
+se = sqrt(var_sm/count_sm + var_lg/count_lg)
+
+T_n = abs(diff/se)
+T_n
+```
+
+Compare to the critical value at $c_{1-0.1/2}=c_{0.95}$
+
+```{r}
+crit_val <- qnorm(0.95)
+```
+
+Because `T_n` (`r T_n`) is greater than the `critical value` (`r crit_val`), we will reject the null hypothesis at the 10% significance level. 
+
+#### Part (vi):
+
+```{r}
+cov_avg = cov(data$avginc,data$math_scr)
+cov_inc = cov(data$income,data$math_scr)
+```
+
+The covariance with `avginc` is `r cov_avg` but the covariance with `income` `r cov_inc`. They are not the same, because the coviariance is not unitless. It is sensitive to changes in units (i.e. to scalar multiplication across all observations)
+
+#### Part (vi)
+
+```{r}
+corr_avg = cor(data$avginc,data$math_scr)
+corr_inc = cor(data$income,data$math_scr)
+```
+
+The correlation with `avginc` is `r corr_avg` and the correlation with `income` is `r corr_inc`. They are the same because the correlation coefficient normalizes by the variances so as to be insensitive to changes in numeraires or other units. 
